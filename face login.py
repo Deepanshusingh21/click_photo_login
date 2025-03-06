@@ -10,47 +10,73 @@ first.config(bg="light blue")
 first.geometry("350x300")
 first.title("Welcome to the main page")
 def login():
-    cam = cv2.VideoCapture(0)
-    face_classifier = cv2.CascadeClassifier('haarcascade_frontalface_default.xml')
-    #file name read
-    list_of_files = glob.glob('C:\\Users\\Deepanshu\\Documents\\python\\TrainingImage\\*') 
-    latest_file = max(list_of_files, key=os.path.getctime)
-    name=os.path.basename(latest_file)
-    name=os.path.splitext(name)[0]
-    name=int(name)
-    name=name+1
-      
-    while(True):
-        ret, img = cam.read()
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        faces = face_classifier.detectMultiScale(img,1.3,5)
+    try:
+        cam = cv2.VideoCapture(0) 
+        face_classifier = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
 
-        for (x,y,w,h) in faces:
-            cv2.rectangle(img,(x,y),(x+w,y+h),(255,0,0),2)        
-            #saving the captured face in the dataset folder TrainingImage
-            cv2.imwrite("TrainingImage\ "+str(name) + ".jpg", img[y:y+h,x:x+w])
-            #display the frame
-            #cv2.imshow('frame',img)
-            #wait for 100 miliseconds 
-        if cv2.waitKey(5)  :
-            break
-            # break if the sample number is morethan 100
-        elif sampleNum>=2:
-            break
-    cam.release()
-    cv2.destroyAllWindows() 
-    user=b.get()
-    passwor=c.get()
-    conn=pymysql.connect(host='localhost',user='root',password='Ankita@18',db='deepanshu')
-    a=conn.cursor()
-    a.execute("select * from login where username='"+user+"'and Password='"+passwor+"'")
-    result=a.fetchall()
-    count=a.rowcount
-    if(count>0):
-        messagebox.showinfo("message"," login")
+        if not cam.isOpened():
+            messagebox.showerror("Error", "Camera not detected!")
+            return
 
-    else:
-        messagebox.showerror("message","not login")
+        # Get latest image file
+        training_path = 'C:\\Users\\Deepanshu\\Documents\\python\\project\\TrainingImage\\'
+        list_of_files = glob.glob(training_path + '*') 
+
+        if list_of_files:
+            latest_file = max(list_of_files, key=os.path.getctime)
+            name = os.path.splitext(os.path.basename(latest_file))[0]
+            name = int(name) + 1
+        else:
+            name = 1  # First image name
+
+        face_detected = False
+        while not face_detected:
+            ret, img = cam.read()
+            if not ret:
+                messagebox.showerror("Error", "Failed to capture image!")
+                return
+
+            gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+            faces = face_classifier.detectMultiScale(gray, 1.3, 5)
+
+            for (x, y, w, h) in faces:
+                face_detected = True
+                cv2.rectangle(img, (x, y), (x + w, y + h), (255, 0, 0), 2)
+                face_img_path = os.path.join(training_path, f"{name}.jpg")
+                cv2.imwrite(face_img_path, img[y:y+h, x:x+w])
+
+            cv2.imshow('Face Capture', img)
+            if cv2.waitKey(100) & 0xFF == ord('q'):
+                break
+
+        cam.release()
+        cv2.destroyAllWindows()
+
+        # User Input (Make sure text & text2 are defined in your UI)
+        user = text.get()
+        password = text2.get()
+
+        # Database Connection
+        try:
+            conn = pymysql.connect(host='localhost', user='root', password='********', db='database')
+            a = conn.cursor()
+            a.execute("SELECT * FROM login WHERE Username=%s AND Password=%s", (user, password))
+            result = a.fetchall()
+            count = a.rowcount
+
+            if count > 0:
+                messagebox.showinfo("Success", "Login Successful!")
+                win.destroy()
+                subprocess.run(["python", "login2.py"])
+            else:
+                messagebox.showerror("Error", "Invalid Credentials! Try again.")
+
+            conn.close()
+        except pymysql.MySQLError as e:
+            messagebox.showerror("Database Error", str(e))
+
+    except Exception as e:
+        messagebox.showerror("Error", str(e))
     
 
 lb=Label(first,text="Login",font=15,width=30,bd=5,relief="raised",fg="black")
